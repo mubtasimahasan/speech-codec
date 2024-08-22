@@ -43,7 +43,7 @@ logger = get_logger(__name__, log_level="INFO")
 def main(args):
     config_path = args.config_path
     config = yaml.safe_load(open(config_path))
-    config['teacher'] = args_teacher
+    config['teacher'] = args.teacher
     
     log_dir = config['log_dir']
     if not osp.exists(log_dir): os.makedirs(log_dir, exist_ok=True)
@@ -323,7 +323,7 @@ def main(args):
             waveform_loss = l1_criterion(recons, signal)
 
             # Semantic Distillation Loss
-            with open(f"{args.rep_path}/{args.rep_type}_train_file_list.txt", "r") as f:
+            with open(f"{args.rep_path}/{args.teacher}_train_file_list.txt", "r") as f:
                 feature_paths = f.readlines()
             
             if args.teacher.startswith('combined'):
@@ -653,7 +653,7 @@ if __name__ == "__main__":
     parser.add_argument('--config_path', type=str, default='config.yml')
     parser.add_argument('--data_path', type=str, default='processed_dataset')
     parser.add_argument('--rep_path', type=str, default='.')
-    parser.add_argument('--rep_type', type=str)
+    parser.add_argument('--teacher', type=str)
     parser.add_argument('--epochs', type=int, required=False)
     parser.add_argument('--continue_train', action='store_true', help='Continue to train from checkpoints')
     args = parser.parse_args()
