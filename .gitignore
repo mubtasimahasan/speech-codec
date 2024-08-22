@@ -1,0 +1,6 @@
+__pycache__
+processed_dataset/
+wandb
+Models/
+*_file_list.txt
+*_rep/

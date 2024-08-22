@@ -1,0 +1,110 @@
+import os
+import random
+import numpy as np
+import soundfile as sf
+import torch
+import torchaudio
+from torch.utils.data import DataLoader
+
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+np.random.seed(114514)
+random.seed(114514)
+
+SPECT_PARAMS = {
+    "n_fft": 2048,
+    "win_length": 1200,
+    "hop_length": 300,
+}
+
+MEL_PARAMS = {
+    "n_mels": 80,
+}
+
+to_mel = torchaudio.transforms.MelSpectrogram(
+    n_mels=MEL_PARAMS['n_mels'], **SPECT_PARAMS)
+mean, std = -4, 4
+
+
+def preprocess(wave):
+    wave_tensor = torch.from_numpy(wave).float() if isinstance(wave, np.ndarray) else wave
+    mel_tensor = to_mel(wave_tensor)
+    mel_tensor = (torch.log(1e-5 + mel_tensor.unsqueeze(0)) - mean) / std
+    return mel_tensor
+
+
+class CustomDataset(torch.utils.data.Dataset):
+    def __init__(self, data_dir, sr=24000):
+        self.data_dir = data_dir
+        self.sr = sr
+        self.data_list = [os.path.join(data_dir, fname) for fname in os.listdir(data_dir) if fname.endswith('.flac')]
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def __getitem__(self, idx):
+        file_path = self.data_list[idx]
+        wave, sr = sf.read(file_path)
+        wave = torch.from_numpy(wave).float()
+        mel = preprocess(wave).squeeze(0)
+        return wave, mel
+
+
+def collate(batch):
+    batch_size = len(batch)
+    lengths = [b[1].shape[1] for b in batch]
+    batch_indexes = np.argsort(lengths)[::-1]
+    batch = [batch[bid] for bid in batch_indexes]
+
+    nmels = batch[0][1].size(0)
+    max_mel_length = max([b[1].shape[1] for b in batch])
+    max_wave_length = max([b[0].size(0) for b in batch])
+
+    mels = torch.zeros((batch_size, nmels, max_mel_length)).float() - 10
+    waves = torch.zeros((batch_size, max_wave_length)).float()
+
+    mel_lengths = torch.zeros(batch_size).long()
+    wave_lengths = torch.zeros(batch_size).long()
+
+    for bid, (wave, mel) in enumerate(batch):
+        mel_size = mel.size(1)
+        mels[bid, :, :mel_size] = mel
+        waves[bid, : wave.size(0)] = wave
+        mel_lengths[bid] = mel_size
+        wave_lengths[bid] = wave.size(0)
+
+    return waves, mels, wave_lengths, mel_lengths
+
+
+def build_dataloader(
+    rank=0,
+    world_size=1,
+    batch_size=32,
+    num_workers=0,
+    prefetch_factor=16,
+    data_path="processed_dataset",
+):
+    dataset = CustomDataset(data_dir=data_path)
+    collate_fn = collate
+    sampler = torch.utils.data.distributed.DistributedSampler(
+        dataset,
+        num_replicas=world_size,
+        rank=rank,
+        shuffle=True,
+        seed=114514,
+    )
+    data_loader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        sampler=sampler,
+        num_workers=num_workers,
+        drop_last=True,
+        collate_fn=collate_fn,
+        pin_memory=True,
+        prefetch_factor=prefetch_factor if num_workers > 0 else None,
+    )
+
+    return data_loader
