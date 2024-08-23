@@ -42,3 +42,4 @@ else
     # If teacher is specified, run the training for that type
     run_training "$TEACHER"
 fi
+

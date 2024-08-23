@@ -1,4 +1,4 @@
-log_dir: "Models/run_timbre_norm_ctc_titanet/"
+log_dir: "saved_files"
 save_freq: 1
 log_interval: 10 #<---changed
 save_interval: 360 #<---changed
@@ -9,7 +9,6 @@ batch_length: 50 # Reduced maximum duration of audio in a batch (in seconds)
 max_len: 40 # Reduced maximum number of frames
 pretrained_model: ""
 load_only_params: False # set to true if do not want to load epoch numbers and optimizer parameters
-
 F0_path: "modules/JDC/bst.t7"
 
 data_params:

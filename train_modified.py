@@ -45,7 +45,7 @@ def main(args):
     config = yaml.safe_load(open(config_path))
     config['teacher'] = args.teacher
     
-    log_dir = config['log_dir']
+    log_dir = f"{config['log_dir']}/{args.teacher}/"
     if not osp.exists(log_dir): os.makedirs(log_dir, exist_ok=True)
     shutil.copy(config_path, osp.join(log_dir, osp.basename(config_path)))
     ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True, broadcast_buffers=True)
@@ -54,7 +54,7 @@ def main(args):
     wandb_api_key = os.environ.get('WANDB_API_KEY')
     # Check if the API key is set
     if wandb_api_key is not None:
-        wandb.init(project='facodec-debug', dir="logs/")
+        wandb.init(project='facodec-debug', dir=log_dir)
         log_with_wandb = "wandb"
         
     accelerator = Accelerator(project_dir=log_dir, split_batches=True, kwargs_handlers=[ddp_kwargs],
@@ -74,7 +74,7 @@ def main(args):
 
     batch_size = config.get('batch_size', 10)
     batch_length = config.get('batch_length', 120)
-    device = accelerator.device if accelerator.num_processes > 1 else torch.device('cpu')
+    device = accelerator.device if accelerator.num_processes > 1 else torch.device('cuda')
 
     if args.epochs is not None:
         epochs = args.epochs
@@ -333,7 +333,7 @@ def main(args):
                 llm_feature = torch.from_numpy(np.load(llm_feature_path)).to(device)
                 # Reshape and transform quantized feature
                 quantizer_feature = rearrange(quantized[0], 'b d t -> b t d')
-                shape_transform = torch.nn.Linear(quantizer_feature.shape[-1], hubert_feature.shape[-1])
+                shape_transform = torch.nn.Linear(quantizer_feature.shape[-1], hubert_feature.shape[-1]).to(device)
                 quantizer_feature = shape_transform(quantizer_feature)
                 # Compute losses
                 loss_distill_hubert = distill_loss(quantizer_feature, hubert_feature)
@@ -355,7 +355,7 @@ def main(args):
                 semantic_feature = torch.from_numpy(np.load(semantic_feature_path)).to(device)
                 # Reshape and transform quantized feature
                 quantizer_feature = rearrange(quantized[0], 'b d t -> b t d')
-                shape_transform = torch.nn.Linear(quantizer_feature.shape[-1], semantic_feature.shape[-1])
+                shape_transform = torch.nn.Linear(quantizer_feature.shape[-1], semantic_feature.shape[-1]).to(device)
                 quantizer_feature = shape_transform(quantizer_feature)
                 # Compute loss
                 loss_distill = distill_loss(quantizer_feature, semantic_feature)
@@ -519,14 +519,14 @@ def main(args):
                 with torch.no_grad():
                     if log_with_wandb is not None:
                         accelerator.log({
-                            'train/gt_audio': wandb.Audio(wav_seg_input[0].cpu().detach().numpy(), 
+                            'train/gt_audio': wandb.Audio(wav_seg_input[0].cpu().detach().numpy().squeeze(), 
                                                         sample_rate=24000, 
                                                         caption="Ground Truth Audio")
                         }, step=iters)
 
                         # Log predicted audio
                         accelerator.log({
-                            'train/pred_audio': wandb.Audio(pred_wave[0].cpu().detach().numpy(), 
+                            'train/pred_audio': wandb.Audio(pred_wave[0].cpu().detach().numpy().squeeze(), 
                                                             sample_rate=24000, 
                                                             caption="Predicted Audio")
                         }, step=iters)
@@ -579,35 +579,35 @@ def main(args):
                     vc_pred_wave = model.decoder(x)
                     if log_with_wandb is not None:
                         accelerator.log({
-                            'partial/pred_audio_p': wandb.Audio(p_pred_wave[0].cpu().detach().numpy(), 
+                            'partial/pred_audio_p': wandb.Audio(p_pred_wave[0].cpu().detach().numpy().squeeze(), 
                                                                 sample_rate=sr, 
                                                                 caption="Partial Predicted Audio P"),
-                            'partial/pred_audio_c': wandb.Audio(c_pred_wave[0].cpu().detach().numpy(), 
+                            'partial/pred_audio_c': wandb.Audio(c_pred_wave[0].cpu().detach().numpy().squeeze(), 
                                                                 sample_rate=sr, 
                                                                 caption="Partial Predicted Audio C"),
-                            'partial/pred_audio_r': wandb.Audio(r_pred_wave[0].cpu().detach().numpy(), 
+                            'partial/pred_audio_r': wandb.Audio(r_pred_wave[0].cpu().detach().numpy().squeeze(), 
                                                                 sample_rate=sr, 
                                                                 caption="Partial Predicted Audio R"),
-                            'partial/pred_audio_pc': wandb.Audio(pc_pred_wave[0].cpu().detach().numpy(), 
+                            'partial/pred_audio_pc': wandb.Audio(pc_pred_wave[0].cpu().detach().numpy().squeeze(), 
                                                                 sample_rate=sr, 
                                                                 caption="Partial Predicted Audio PC"),
-                            'partial/pred_audio_pr': wandb.Audio(pr_pred_wave[0].cpu().detach().numpy(), 
+                            'partial/pred_audio_pr': wandb.Audio(pr_pred_wave[0].cpu().detach().numpy().squeeze(), 
                                                                 sample_rate=sr, 
                                                                 caption="Partial Predicted Audio PR"),
-                            'partial/pred_audio_pcr': wandb.Audio(pcr_pred_wave[0].cpu().detach().numpy(), 
+                            'partial/pred_audio_pcr': wandb.Audio(pcr_pred_wave[0].cpu().detach().numpy().squeeze(), 
                                                                 sample_rate=sr, 
                                                                 caption="Partial Predicted Audio PCR")
                                                                 }, step=iters)
                         accelerator.log({
-                            'full/pred_audio': wandb.Audio(full_pred_wave[0].cpu().detach().numpy(), 
+                            'full/pred_audio': wandb.Audio(full_pred_wave[0].cpu().detach().numpy().squeeze(), 
                                                         sample_rate=sr, 
                                                         caption="Full Predicted Audio")
                                                         }, step=iters)
                         accelerator.log({
-                            'vc/ref_audio': wandb.Audio(waves[1].cpu().detach().numpy(), 
+                            'vc/ref_audio': wandb.Audio(waves[1].cpu().detach().numpy().squeeze(), 
                                                         sample_rate=sr, 
                                                         caption="VC Reference Audio"),
-                            'vc/pred_audio': wandb.Audio(vc_pred_wave[0].cpu().detach().numpy(), 
+                            'vc/pred_audio': wandb.Audio(vc_pred_wave[0].cpu().detach().numpy().squeeze(), 
                                                         sample_rate=sr, 
                                                         caption="VC Predicted Audio")
                                                         }, step=iters)
