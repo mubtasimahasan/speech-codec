@@ -4,8 +4,8 @@
 DATASET="zachary24/librispeech_train_clean_100"
 SPLIT="train"
 SEGMENT_LENGTH=3.0
-# RATIO=1.0
-RATIO=0.00084
+RATIO=1.0
+# RATIO=0.00084
     
 # Script to process the dataset
 echo "Running process_dataset.py script with the following parameters:"

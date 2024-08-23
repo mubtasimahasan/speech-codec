@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Default Variables
-CONFIG_PATH="config_debug.yml"
-DATA_PATH="processed_dataset"
+CONFIG_PATH="configs/config.yml"
+DATA_PATH="processed_dataset" 
 REP_PATH="."
-EPOCHS=20
+EPOCHS=10 # reduced for debugging
 TEACHER=""
 FLAG=""
 

@@ -328,6 +328,8 @@ def main(args):
             
             if args.teacher.startswith('combined'):
                 _, hubert_feature_path, llm_feature_path = feature_paths[i].strip().split("\t")
+                hubert_feature_path = f"{args.rep_path.rstrip('/')}/{hubert_feature_path}"
+                llm_feature_path = f"{args.rep_path.rstrip('/')}/{llm_feature_path}"
                 # Load features
                 hubert_feature = torch.from_numpy(np.load(hubert_feature_path)).to(device)
                 llm_feature = torch.from_numpy(np.load(llm_feature_path)).to(device)
@@ -351,6 +353,7 @@ def main(args):
             else:
                 # Single teacher case
                 semantic_feature_path = feature_paths[i].strip().split("\t")[1]
+                semantic_feature_path = f"{args.rep_path.rstrip('/')}/{semantic_feature_path}"
                 # Load feature
                 semantic_feature = torch.from_numpy(np.load(semantic_feature_path)).to(device)
                 # Reshape and transform quantized feature

@@ -5,8 +5,8 @@ CONFIG="config_modified.json"
 AUDIO_DIR="processed_dataset"
 EXTS="flac,wav"
 SPLIT_SEED=42
-# VALID_SET_SIZE=0.00467
-VALID_SET_SIZE=0.34
+VALID_SET_SIZE=0.00467
+# VALID_SET_SIZE=0.34
 
 # Assign the first argument to SEMANTIC
 SEMANTIC="${1:-all}"  # If no argument is provided, default to "all"
