@@ -1,14 +1,15 @@
 log_dir: "saved_files"
 save_freq: 1
-log_interval: 10 #<---changed
-save_interval: 360 #<---changed
+log_interval: 10
+save_interval: 1000
 device: "cuda"
-epochs: 500 #<---changed
-batch_size: 4 
-batch_length: 50 # Reduced maximum duration of audio in a batch (in seconds)
-max_len: 40 # Reduced maximum number of frames
+epochs: 1000 # number of epochs for first stage training (pre-training)
+batch_size: 6
+batch_length: 100 # maximum duration of audio in a batch (in seconds)
+max_len: 80 # maximum number of frames
 pretrained_model: ""
 load_only_params: False # set to true if do not want to load epoch numbers and optimizer parameters
+
 F0_path: "modules/JDC/bst.t7"
 
 data_params:
@@ -17,35 +18,35 @@ data_params:
   root_path: "./data/"
 
 preprocess_params:
-  sr: 24000
+  sr: 16000
   spect_params:
-    n_fft: 2048
-    win_length: 1200
-    hop_length: 300
+    n_fft: 1024
+    win_length: 1024
+    hop_length: 240
 
 model_params:
   fixed: True
   causal: True
-  lstm: 2 
+  lstm: 2
   norm_f0: True
   use_gr_content_f0: False
   use_gr_prosody_phone: False
   use_gr_timbre_prosody: False
   separate_prosody_encoder: True
-  n_c_codebooks: 1 # Reduced number of codebooks
+  n_c_codebooks: 2
   timbre_norm: True
   use_gr_content_global_f0: True
   w2v: 'w2v-ctc'
 
   DAC:
-    encoder_dim: 32 # Reduced encoder dimension
+    encoder_dim: 64
     encoder_rates: [2, 5, 5, 6]
-    decoder_dim: 64 # Reduced decoder dimension
-    decoder_rates: [6, 5, 5, 2]
+    decoder_dim: 1536
+    decoder_rates: [ 6, 5, 5, 2 ]
     sr: 24000
 
 loss_params:
-  base_lr: 0.01 #<---changed
+  base_lr: 0.0001
   discriminator_iter_start: 2000
   lambda_spk: 1.0
   lambda_mel: 45

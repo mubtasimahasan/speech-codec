@@ -52,19 +52,17 @@ def main(args):
     
     log_with_wandb = None
     wandb_api_key = os.environ.get('WANDB_API_KEY')
-    # Check if the API key is set
-    if wandb_api_key is not None:
-        wandb.init(project='facodec-debug', dir=log_dir)
-        log_with_wandb = "wandb"
-        
-    accelerator = Accelerator(project_dir=log_dir, split_batches=True, kwargs_handlers=[ddp_kwargs],
-                             log_with=log_with_wandb)     
     
-    accelerator.init_trackers("facodec-debug", config=config)
-    #accelerator.init_trackers("facodec-training-debugrun2", config=config)
+    if wandb_api_key is not None:
+        log_with_wandb = "wandb"
+    
+    accelerator = Accelerator(project_dir=log_dir, split_batches=True, kwargs_handlers=[ddp_kwargs], log_with=log_with_wandb)
 
     if accelerator.is_main_process:
-        writer = SummaryWriter(log_dir + "/tensorboard")
+        accelerator.init_trackers("facodec-doom", config=config)
+        # Only initialize TensorBoard if wandb is not used
+        if log_with_wandb is None:
+            writer = SummaryWriter(log_dir + "/tensorboard")
 
     # write logs
     file_handler = logging.FileHandler(osp.join(log_dir, 'train.log'))
@@ -322,46 +320,50 @@ def main(args):
             mel_loss = mel_criterion(recons, signal)
             waveform_loss = l1_criterion(recons, signal)
 
-            # Semantic Distillation Loss
-            with open(f"{args.rep_path}/{args.teacher}_train_file_list.txt", "r") as f:
-                feature_paths = f.readlines()
-            
-            if args.teacher.startswith('combined'):
-                _, hubert_feature_path, llm_feature_path = feature_paths[i].strip().split("\t")
-                hubert_feature_path = f"{args.rep_path.rstrip('/')}/{hubert_feature_path}"
-                llm_feature_path = f"{args.rep_path.rstrip('/')}/{llm_feature_path}"
-                # Load features
-                hubert_feature = torch.from_numpy(np.load(hubert_feature_path)).to(device)
-                llm_feature = torch.from_numpy(np.load(llm_feature_path)).to(device)
-                # Reshape and transform quantized feature
-                quantizer_feature = rearrange(quantized[0], 'b d t -> b t d')
-                shape_transform = torch.nn.Linear(quantizer_feature.shape[-1], hubert_feature.shape[-1]).to(device)
-                quantizer_feature = shape_transform(quantizer_feature)
-                # Compute losses
-                loss_distill_hubert = distill_loss(quantizer_feature, hubert_feature)
-                loss_distill_llm = distill_loss(quantizer_feature, llm_feature)
-                
-                if args.teacher.startswith('combined_'):
-                    _, weight_hubert, weight_llm = args.teacher.split('_')
-                    weight_hubert = float(weight_hubert)
-                    weight_llm = float(weight_llm)
-                    loss_distill = (loss_distill_hubert * weight_hubert + loss_distill_llm * weight_llm) / 2
-                else:
-                    # Average the losses
-                    loss_distill = (loss_distill_hubert + loss_distill_llm) / 2
-
+            # Just say 'no' to dont get semantic distillation.
+            if args.teacher == 'no':
+                loss_distill = 0.0
+            # Semantic Distillation Loss:   
             else:
-                # Single teacher case
-                semantic_feature_path = feature_paths[i].strip().split("\t")[1]
-                semantic_feature_path = f"{args.rep_path.rstrip('/')}/{semantic_feature_path}"
-                # Load feature
-                semantic_feature = torch.from_numpy(np.load(semantic_feature_path)).to(device)
-                # Reshape and transform quantized feature
-                quantizer_feature = rearrange(quantized[0], 'b d t -> b t d')
-                shape_transform = torch.nn.Linear(quantizer_feature.shape[-1], semantic_feature.shape[-1]).to(device)
-                quantizer_feature = shape_transform(quantizer_feature)
-                # Compute loss
-                loss_distill = distill_loss(quantizer_feature, semantic_feature)
+                with open(f"{args.rep_path}/{args.teacher}_train_file_list.txt", "r") as f:
+                    feature_paths = f.readlines()
+                
+                if args.teacher.startswith('combined'):
+                    _, hubert_feature_path, llm_feature_path = feature_paths[i].strip().split("\t")
+                    hubert_feature_path = f"{args.rep_path.rstrip('/')}/{hubert_feature_path}"
+                    llm_feature_path = f"{args.rep_path.rstrip('/')}/{llm_feature_path}"
+                    # Load features
+                    hubert_feature = torch.from_numpy(np.load(hubert_feature_path)).to(device)
+                    llm_feature = torch.from_numpy(np.load(llm_feature_path)).to(device)
+                    # Reshape and transform quantized feature
+                    quantizer_feature = rearrange(quantized[0], 'b d t -> b t d')
+                    shape_transform = torch.nn.Linear(quantizer_feature.shape[-1], hubert_feature.shape[-1]).to(device)
+                    quantizer_feature = shape_transform(quantizer_feature)
+                    # Compute losses
+                    loss_distill_hubert = distill_loss(quantizer_feature, hubert_feature)
+                    loss_distill_llm = distill_loss(quantizer_feature, llm_feature)
+                    
+                    if args.teacher.startswith('combined_'):
+                        _, weight_hubert, weight_llm = args.teacher.split('_')
+                        weight_hubert = float(weight_hubert)
+                        weight_llm = float(weight_llm)
+                        loss_distill = (loss_distill_hubert * weight_hubert + loss_distill_llm * weight_llm) / 2
+                    else:
+                        # Average the losses
+                        loss_distill = (loss_distill_hubert + loss_distill_llm) / 2
+
+                else:
+                    # Single teacher case
+                    semantic_feature_path = feature_paths[i].strip().split("\t")[1]
+                    semantic_feature_path = f"{args.rep_path.rstrip('/')}/{semantic_feature_path}"
+                    # Load feature
+                    semantic_feature = torch.from_numpy(np.load(semantic_feature_path)).to(device)
+                    # Reshape and transform quantized feature
+                    quantizer_feature = rearrange(quantized[0], 'b d t -> b t d')
+                    shape_transform = torch.nn.Linear(quantizer_feature.shape[-1], semantic_feature.shape[-1]).to(device)
+                    quantizer_feature = shape_transform(quantizer_feature)
+                    # Compute loss
+                    loss_distill = distill_loss(quantizer_feature, semantic_feature)
 
             d_fake = model.discriminator(pred_wave)
             d_real = model.discriminator(wav_seg_target)

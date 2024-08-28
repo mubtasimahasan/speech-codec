@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Default Variables
-CONFIG_PATH="configs/config.yml"
+CONFIG_PATH="config_modified.yml"
 DATA_PATH="processed_dataset" 
 REP_PATH="."
 EPOCHS=10 # reduced for debugging
