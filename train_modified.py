@@ -322,7 +322,7 @@ def main(args):
 
             # Just say 'no' to dont get semantic distillation.
             if args.teacher == 'no':
-                loss_distill = 0.0
+                loss_distill = torch.tensor(0.0, device=device)
             # Semantic Distillation Loss:   
             else:
                 with open(f"{args.rep_path}/{args.teacher}_train_file_list.txt", "r") as f:

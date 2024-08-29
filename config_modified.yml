@@ -21,8 +21,8 @@ preprocess_params:
   sr: 16000
   spect_params:
     n_fft: 1024
-    win_length: 1024
-    hop_length: 240
+    win_length: 800
+    hop_length: 200
 
 model_params:
   fixed: True
